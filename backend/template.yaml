@@ -1,0 +1,144 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  CloudCart - Serverless E-Commerce & Order Management Platform
+  Production-ready AWS SAM template provisioning API Gateway, Python Lambdas, and DynamoDB.
+
+Globals:
+  Function:
+    Timeout: 15
+    MemorySize: 256
+    Runtime: python3.12
+    Tracing: Active
+    Environment:
+      Variables:
+        PRODUCTS_TABLE: !Ref ProductsTable
+        ORDERS_TABLE: !Ref OrdersTable
+        POWERTOOLS_SERVICE_NAME: cloudcart-api
+
+Resources:
+  # ==========================================
+  # API Gateway REST API
+  # ==========================================
+  CloudCartApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Cors:
+        AllowMethods: "'GET,POST,PATCH,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+      OpenApiVersion: '3.0.1'
+
+  # ==========================================
+  # Products Lambda Function
+  # ==========================================
+  ProductsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: handlers.products_handler.lambda_handler
+      Description: Handles product catalog listing and single product lookup.
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ProductsTable
+      Events:
+        GetProducts:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CloudCartApi
+            Path: /products
+            Method: GET
+        GetProductById:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CloudCartApi
+            Path: /products/{id}
+            Method: GET
+
+  # ==========================================
+  # Orders Lambda Function
+  # ==========================================
+  OrdersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: handlers.orders_handler.lambda_handler
+      Description: Handles order creation, inventory stock deduction, retrieval, and status updates.
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OrdersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ProductsTable
+      Events:
+        CreateOrder:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CloudCartApi
+            Path: /orders
+            Method: POST
+        GetOrders:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CloudCartApi
+            Path: /orders
+            Method: GET
+        GetOrderById:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CloudCartApi
+            Path: /orders/{id}
+            Method: GET
+        UpdateOrderStatus:
+          Type: Api
+          Properties:
+            RestApiId: !Ref CloudCartApi
+            Path: /orders/{id}/status
+            Method: PATCH
+
+  # ==========================================
+  # DynamoDB Persistence Tables (On-Demand)
+  # ==========================================
+  ProductsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: CloudCart-Products
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: productId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: productId
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  OrdersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: CloudCart-Orders
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: orderId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: orderId
+          KeyType: HASH
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+# ==========================================
+# Stack Outputs
+# ==========================================
+Outputs:
+  CloudCartApiEndpoint:
+    Description: Production API Gateway Endpoint URL for CloudCart
+    Value: !Sub "https://${CloudCartApi}.execute-api.${AWS::Region}.amazonaws.com/Prod"
+
+  ProductsTableArn:
+    Description: ARN of the DynamoDB Products Table
+    Value: !GetAtt ProductsTable.Arn
+
+  OrdersTableArn:
+    Description: ARN of the DynamoDB Orders Table
+    Value: !GetAtt OrdersTable.Arn

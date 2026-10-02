@@ -1,0 +1,25 @@
+# Node dependencies and build artifacts
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# Python artifacts
+backend/__pycache__/
+backend/*/__pycache__/
+*.py[cod]
+*$py.class
+backend/.pytest_cache/
+backend/data/local_storage.json
+venv/
+.env
+
+# AWS SAM build artifacts
+.aws-sam/
+
+# OS and IDE files
+.DS_Store
+.vscode/
+.idea/
